@@ -1,0 +1,46 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+allprojects {
+    apply plugin: 'eclipse'
+    apply plugin: 'idea'
+
+    ext {
+        appName = 'ZTypeClone'
+        gdxVersion = '1.12.1'
+    }
+
+    repositories {
+        mavenCentral()
+    }
+}
+
+project(':core') {
+    apply plugin: 'java-library'
+
+    dependencies {
+        api "com.badlogicgames.gdx:gdx:$gdxVersion"
+    }
+}
+
+project(':desktop') {
+    apply plugin: 'application'
+
+    dependencies {
+        implementation project(':core')
+        implementation "com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion"
+        implementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
+    }
+
+    application {
+        mainClass = 'com.ztype.game.DesktopLauncher'
+    }
+}
+
+tasks.register('runDesktop') {
+    dependsOn ':desktop:run'
+}
