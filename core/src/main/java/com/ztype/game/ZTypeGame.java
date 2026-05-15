@@ -24,11 +24,9 @@ public class ZTypeGame extends ApplicationAdapter {
     private static final float DANGER_LINE_Y = 20f;
     private static final float KEYBOARD_AREA_HEIGHT = 420f;
     private static final float KEYBOARD_SHIFT_DOWN = 28f;
-    private static final float MOBILE_SPAWN_INTERVAL_SCALE = 1.28f;
-    private static final float MOBILE_ENEMY_SPEED_SCALE = 0.76f;
+    private static final float SPAWN_INTERVAL_SCALE = 1.28f;
+    private static final float ENEMY_SPEED_SCALE = 0.76f;
     private static final float MOBILE_ACTION_ROW_Y = 4f;
-    private static final float DESKTOP_SPAWN_INTERVAL_SCALE = 1f;
-    private static final float DESKTOP_ENEMY_SPEED_SCALE = 1f;
 
     private static final String[] WORDS = {
             "code", "bug", "array", "loop", "class", "object", "event", "canvas", "game", "score",
@@ -64,8 +62,6 @@ public class ZTypeGame extends ApplicationAdapter {
     private float enemyBaseSpeed;
     private float enemyMinY;
     private boolean showTouchKeyboard;
-    private float mobileSpawnScale;
-    private float mobileSpeedScale;
 
     private final Array<KeyButton> keyButtons = new Array<>();
 
@@ -93,8 +89,6 @@ public class ZTypeGame extends ApplicationAdapter {
         viewport.apply(true);
 
         enemyMinY = showTouchKeyboard ? DANGER_LINE_Y + KEYBOARD_AREA_HEIGHT : DANGER_LINE_Y;
-        mobileSpawnScale = showTouchKeyboard ? MOBILE_SPAWN_INTERVAL_SCALE : DESKTOP_SPAWN_INTERVAL_SCALE;
-        mobileSpeedScale = showTouchKeyboard ? MOBILE_ENEMY_SPEED_SCALE : DESKTOP_ENEMY_SPEED_SCALE;
 
         for (int i = 0; i < 70; i++) {
             stars.add(new Star(MathUtils.random(0f, WORLD_WIDTH), MathUtils.random(0f, WORLD_HEIGHT), MathUtils.random(0f, 10f), MathUtils.random(0, 3)));
@@ -210,8 +204,8 @@ public class ZTypeGame extends ApplicationAdapter {
         int newLevel = 1 + (int) (elapsedTime / 18f);
         if (newLevel != level) {
             level = newLevel;
-            spawnInterval = Math.max(minSpawnInterval, (1.5f - (level - 1) * 0.11f) * mobileSpawnScale);
-            enemyBaseSpeed = (28f + (level - 1) * 3f) * mobileSpeedScale;
+            spawnInterval = Math.max(minSpawnInterval, (1.5f - (level - 1) * 0.11f) * SPAWN_INTERVAL_SCALE);
+            enemyBaseSpeed = (28f + (level - 1) * 3f) * ENEMY_SPEED_SCALE;
         }
     }
 
@@ -219,7 +213,7 @@ public class ZTypeGame extends ApplicationAdapter {
         String word = WORDS[MathUtils.random(WORDS.length - 1)];
         float margin = 80f;
         float x = MathUtils.random(margin, WORLD_WIDTH - margin);
-        float speed = (enemyBaseSpeed + MathUtils.random(0f, 18f) + level * 4f) * mobileSpeedScale;
+        float speed = (enemyBaseSpeed + MathUtils.random(0f, 18f) + level * 4f) * ENEMY_SPEED_SCALE;
         enemies.add(new Enemy(enemyIdSeed++, word, x, worldHeight + 10f, speed, 20f));
     }
 
