@@ -24,3 +24,9 @@ bin/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Web release (keep staged web output)
+!gwt/build/
+gwt/build/*
+!gwt/build/gwt-stage/
+!gwt/build/gwt-stage/**

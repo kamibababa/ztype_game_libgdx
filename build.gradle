@@ -47,6 +47,78 @@ project(':desktop') {
     }
 }
 
+project(':gwt') {
+    apply plugin: 'java-library'
+    apply plugin: 'war'
+
+    configurations {
+        gwtModuleSources
+    }
+
+    dependencies {
+        implementation project(':core')
+        implementation "com.badlogicgames.gdx:gdx-backend-gwt:$gdxVersion"
+        implementation "com.badlogicgames.gdx:gdx:$gdxVersion:sources"
+        implementation "com.badlogicgames.gdx:gdx-backend-gwt:$gdxVersion:sources"
+        implementation "com.google.gwt:gwt-user:2.10.0"
+        implementation "com.google.gwt:gwt-dev:2.10.0"
+        implementation "com.google.jsinterop:jsinterop-annotations:1.0.2"
+        gwtModuleSources "com.google.jsinterop:jsinterop-annotations:1.0.2:sources"
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs = ['src/main/java']
+            resources.srcDirs = ['src/main/resources']
+        }
+    }
+
+    tasks.register('gwtCompile', JavaExec) {
+        group = 'gwt'
+        description = 'Compiles the GWT web application'
+        mainClass = 'com.google.gwt.dev.Compiler'
+        classpath = files(
+                sourceSets.main.java.srcDirs,
+                project(':core').sourceSets.main.java.srcDirs,
+                configurations.gwtModuleSources,
+                sourceSets.main.runtimeClasspath
+        )
+        args = [
+                'com.ztype.game.GdxDefinition',
+                '-war', file('build/gwt').absolutePath,
+                '-strict'
+        ]
+        dependsOn classes
+    }
+
+    tasks.register('gwtSuperDev', JavaExec) {
+        group = 'gwt'
+        description = 'Starts GWT Super Dev Mode server'
+        mainClass = 'com.google.gwt.dev.codeserver.CodeServer'
+        classpath = files(
+                sourceSets.main.java.srcDirs,
+                project(':core').sourceSets.main.java.srcDirs,
+                configurations.gwtModuleSources,
+                sourceSets.main.runtimeClasspath
+        )
+        args = [
+                '-src', file('../core/src/main/java').absolutePath,
+                '-src', file('src/main/java').absolutePath,
+                'com.ztype.game.GdxDefinition'
+        ]
+        dependsOn classes
+    }
+
+    tasks.register('gwtStage', Copy) {
+        group = 'gwt'
+        description = 'Stages runnable web files with index.html'
+        dependsOn 'gwtCompile'
+        from 'webapp'
+        from 'build/gwt'
+        into 'build/gwt-stage'
+    }
+}
+
 project(':android') {
     apply plugin: 'com.android.application'
 
@@ -139,4 +211,12 @@ project(':android') {
 
 tasks.register('runDesktop') {
     dependsOn ':desktop:run'
+}
+
+tasks.register('runGwt') {
+    dependsOn ':gwt:gwtSuperDev'
+}
+
+tasks.register('stageGwt') {
+    dependsOn ':gwt:gwtStage'
 }

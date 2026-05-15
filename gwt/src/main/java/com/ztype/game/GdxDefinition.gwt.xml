@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module rename-to='html'>
+    <inherits name='jsinterop.annotations.Annotations' />
+    <inherits name='com.badlogic.gdx.backends.gdx_backends_gwt' />
+    <inherits name='com.ztype.game.CoreGdxDefinition' />
+    <set-configuration-property name='gdx.assetpath' value='webapp/assets' />
+    <entry-point class='com.ztype.game.client.HtmlLauncher' />
+    <source path='client' />
+</module>
