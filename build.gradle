@@ -62,13 +62,13 @@ project(':android') {
 
     android {
         namespace 'com.ztype.game.android'
-        compileSdk 35
-        buildToolsVersion '37.0.0'
+        compileSdk 34
+        buildToolsVersion '34.0.0'
 
         defaultConfig {
             applicationId 'com.ztype.game'
             minSdk 24
-            targetSdk 35
+            targetSdk 34
             versionCode 1
             versionName '1.0'
         }

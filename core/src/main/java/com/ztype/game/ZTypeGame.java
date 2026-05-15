@@ -7,7 +7,6 @@ import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -25,6 +24,11 @@ public class ZTypeGame extends ApplicationAdapter {
     private static final float DANGER_LINE_Y = 20f;
     private static final float KEYBOARD_AREA_HEIGHT = 420f;
     private static final float KEYBOARD_SHIFT_DOWN = 28f;
+    private static final float MOBILE_SPAWN_INTERVAL_SCALE = 1.28f;
+    private static final float MOBILE_ENEMY_SPEED_SCALE = 0.76f;
+    private static final float MOBILE_ACTION_ROW_Y = 4f;
+    private static final float DESKTOP_SPAWN_INTERVAL_SCALE = 1f;
+    private static final float DESKTOP_ENEMY_SPEED_SCALE = 1f;
 
     private static final String[] WORDS = {
             "code", "bug", "array", "loop", "class", "object", "event", "canvas", "game", "score",
@@ -75,10 +79,6 @@ public class ZTypeGame extends ApplicationAdapter {
 
         font.getData().setScale(2.0f);
         uiFont.getData().setScale(2.0f);
-        font.setUseIntegerPositions(true);
-        uiFont.setUseIntegerPositions(true);
-        font.getRegion().getTexture().setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
-        uiFont.getRegion().getTexture().setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
 
         camera = new OrthographicCamera();
         showTouchKeyboard = isTouchPlatform();
@@ -93,8 +93,8 @@ public class ZTypeGame extends ApplicationAdapter {
         viewport.apply(true);
 
         enemyMinY = showTouchKeyboard ? DANGER_LINE_Y + KEYBOARD_AREA_HEIGHT : DANGER_LINE_Y;
-        mobileSpawnScale = showTouchKeyboard ? 1.28f : 1f;
-        mobileSpeedScale = showTouchKeyboard ? 0.76f : 1f;
+        mobileSpawnScale = showTouchKeyboard ? MOBILE_SPAWN_INTERVAL_SCALE : DESKTOP_SPAWN_INTERVAL_SCALE;
+        mobileSpeedScale = showTouchKeyboard ? MOBILE_ENEMY_SPEED_SCALE : DESKTOP_ENEMY_SPEED_SCALE;
 
         for (int i = 0; i < 70; i++) {
             stars.add(new Star(MathUtils.random(0f, WORLD_WIDTH), MathUtils.random(0f, WORLD_HEIGHT), MathUtils.random(0f, 10f), MathUtils.random(0, 3)));
@@ -344,14 +344,14 @@ public class ZTypeGame extends ApplicationAdapter {
             String todo = enemy.word.substring(enemy.progress);
 
             glyphLayout.setText(font, enemy.word);
-            float startX = MathUtils.floor(enemy.x - glyphLayout.width / 2f);
-            float textY = MathUtils.floor(enemy.y - 40f);
+            float startX = enemy.x - glyphLayout.width / 2f;
+            float textY = enemy.y - 40f;
 
             font.setColor(Color.valueOf("86efac"));
             font.draw(batch, done, startX, textY);
 
             glyphLayout.setText(font, done);
-            float doneWidth = MathUtils.floor(glyphLayout.width);
+            float doneWidth = glyphLayout.width;
             font.setColor(Color.WHITE);
             font.draw(batch, todo, startX + doneWidth, textY);
         }
@@ -405,7 +405,7 @@ public class ZTypeGame extends ApplicationAdapter {
         addKeyRow("ASDFGHJKL", areaTop - outerPadding * 2f - rowHeight * 2f - down, outerPadding + 38f, gap, rowHeight);
         addKeyRow("ZXCVBNM", areaTop - outerPadding * 3f - rowHeight * 3f - down, outerPadding + 96f, gap, rowHeight);
 
-        float actionY = 4f;
+        float actionY = MOBILE_ACTION_ROW_Y;
         float actionGap = 12f;
         float actionWidth = (WORLD_WIDTH - outerPadding * 2f - actionGap) / 2f;
         float actionHeight = 64f;
