@@ -1,22 +1,30 @@
 package com.ztype.game;
 
 import com.badlogic.gdx.ApplicationAdapter;
+import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.badlogic.gdx.utils.viewport.Viewport;
 
 public class ZTypeGame extends ApplicationAdapter {
-    private static final float WORLD_WIDTH = 960f;
-    private static final float WORLD_HEIGHT = 640f;
+    private static final float WORLD_WIDTH = 900f;
+    private static final float WORLD_HEIGHT = 1400f;
     private static final float DANGER_LINE_Y = 20f;
+    private static final float KEYBOARD_AREA_HEIGHT = 420f;
+    private static final float KEYBOARD_SHIFT_DOWN = 28f;
 
     private static final String[] WORDS = {
             "code", "bug", "array", "loop", "class", "object", "event", "canvas", "game", "score",
@@ -33,8 +41,12 @@ public class ZTypeGame extends ApplicationAdapter {
     private BitmapFont uiFont;
     private GlyphLayout glyphLayout;
     private OrthographicCamera camera;
+    private Viewport viewport;
+    private final Vector3 touchPoint = new Vector3();
+    private float worldHeight;
 
     private boolean running;
+    private boolean paused;
     private int score;
     private int lives;
     private int level;
@@ -46,6 +58,12 @@ public class ZTypeGame extends ApplicationAdapter {
     private float spawnInterval;
     private float minSpawnInterval;
     private float enemyBaseSpeed;
+    private float enemyMinY;
+    private boolean showTouchKeyboard;
+    private float mobileSpawnScale;
+    private float mobileSpeedScale;
+
+    private final Array<KeyButton> keyButtons = new Array<>();
 
     @Override
     public void create() {
@@ -55,14 +73,32 @@ public class ZTypeGame extends ApplicationAdapter {
         uiFont = new BitmapFont();
         glyphLayout = new GlyphLayout();
 
-        font.getData().setScale(1.2f);
-        uiFont.getData().setScale(1.0f);
+        font.getData().setScale(2.0f);
+        uiFont.getData().setScale(2.0f);
+        font.setUseIntegerPositions(true);
+        uiFont.setUseIntegerPositions(true);
+        font.getRegion().getTexture().setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+        uiFont.getRegion().getTexture().setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
 
         camera = new OrthographicCamera();
-        camera.setToOrtho(false, WORLD_WIDTH, WORLD_HEIGHT);
+        showTouchKeyboard = isTouchPlatform();
+        worldHeight = WORLD_HEIGHT;
+        if (showTouchKeyboard) {
+            float aspect = (float) Gdx.graphics.getHeight() / (float) Gdx.graphics.getWidth();
+            worldHeight = Math.max(WORLD_HEIGHT, WORLD_WIDTH * aspect);
+        }
+        viewport = showTouchKeyboard
+                ? new FitViewport(WORLD_WIDTH, worldHeight, camera)
+                : new FitViewport(WORLD_WIDTH, WORLD_HEIGHT, camera);
+        viewport.apply(true);
+
+        enemyMinY = showTouchKeyboard ? DANGER_LINE_Y + KEYBOARD_AREA_HEIGHT : DANGER_LINE_Y;
+        mobileSpawnScale = showTouchKeyboard ? 1.28f : 1f;
+        mobileSpeedScale = showTouchKeyboard ? 0.76f : 1f;
 
         for (int i = 0; i < 70; i++) {
             stars.add(new Star(MathUtils.random(0f, WORLD_WIDTH), MathUtils.random(0f, WORLD_HEIGHT), MathUtils.random(0f, 10f), MathUtils.random(0, 3)));
+            stars.get(i).y = MathUtils.random(0f, worldHeight);
         }
 
         resetGame();
@@ -84,11 +120,26 @@ public class ZTypeGame extends ApplicationAdapter {
                 }
                 return false;
             }
+
+            @Override
+            public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+                viewport.unproject(touchPoint.set(screenX, screenY, 0f));
+                return handleTouchInput(touchPoint.x, touchPoint.y);
+            }
         });
+
+        rebuildKeyboardLayout();
+        resize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+    }
+
+    private boolean isTouchPlatform() {
+        Application.ApplicationType appType = Gdx.app.getType();
+        return appType == Application.ApplicationType.Android || appType == Application.ApplicationType.iOS;
     }
 
     private void resetGame() {
         running = true;
+        paused = false;
         score = 0;
         lives = 5;
         level = 1;
@@ -126,6 +177,10 @@ public class ZTypeGame extends ApplicationAdapter {
             return;
         }
 
+        if (paused) {
+            return;
+        }
+
         elapsedTime += dt;
         updateDifficulty();
 
@@ -138,7 +193,7 @@ public class ZTypeGame extends ApplicationAdapter {
         for (int i = enemies.size - 1; i >= 0; i--) {
             Enemy enemy = enemies.get(i);
             enemy.y -= enemy.speed * dt;
-            if (enemy.y <= DANGER_LINE_Y) {
+            if (enemy.y <= enemyMinY) {
                 if (lockedEnemyId == enemy.id) {
                     lockedEnemyId = -1;
                 }
@@ -155,8 +210,8 @@ public class ZTypeGame extends ApplicationAdapter {
         int newLevel = 1 + (int) (elapsedTime / 18f);
         if (newLevel != level) {
             level = newLevel;
-            spawnInterval = Math.max(minSpawnInterval, 1.5f - (level - 1) * 0.11f);
-            enemyBaseSpeed = 28f + (level - 1) * 3f;
+            spawnInterval = Math.max(minSpawnInterval, (1.5f - (level - 1) * 0.11f) * mobileSpawnScale);
+            enemyBaseSpeed = (28f + (level - 1) * 3f) * mobileSpeedScale;
         }
     }
 
@@ -164,8 +219,8 @@ public class ZTypeGame extends ApplicationAdapter {
         String word = WORDS[MathUtils.random(WORDS.length - 1)];
         float margin = 80f;
         float x = MathUtils.random(margin, WORLD_WIDTH - margin);
-        float speed = enemyBaseSpeed + MathUtils.random(0f, 18f) + level * 4f;
-        enemies.add(new Enemy(enemyIdSeed++, word, x, WORLD_HEIGHT + 10f, speed, 20f));
+        float speed = (enemyBaseSpeed + MathUtils.random(0f, 18f) + level * 4f) * mobileSpeedScale;
+        enemies.add(new Enemy(enemyIdSeed++, word, x, worldHeight + 10f, speed, 20f));
     }
 
     private Enemy getLockedEnemy() {
@@ -244,13 +299,13 @@ public class ZTypeGame extends ApplicationAdapter {
     private void drawBackground(float dt) {
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         shapeRenderer.setColor(0.03f, 0.07f, 0.15f, 1f);
-        shapeRenderer.rect(0f, 0f, WORLD_WIDTH, WORLD_HEIGHT);
+        shapeRenderer.rect(0f, 0f, WORLD_WIDTH, worldHeight);
 
         for (Star star : stars) {
             float speed = 16f + star.band * 8f;
             star.y -= speed * dt;
             if (star.y < 0f) {
-                star.y = WORLD_HEIGHT;
+                star.y = worldHeight;
             }
 
             float alpha = 0.2f + star.alphaBand * 0.15f;
@@ -259,7 +314,12 @@ public class ZTypeGame extends ApplicationAdapter {
         }
 
         shapeRenderer.setColor(0.98f, 0.44f, 0.57f, 0.35f);
-        shapeRenderer.rect(0f, DANGER_LINE_Y, WORLD_WIDTH, 2f);
+        shapeRenderer.rect(0f, enemyMinY, WORLD_WIDTH, 2f);
+
+        if (showTouchKeyboard) {
+            shapeRenderer.setColor(0.05f, 0.08f, 0.18f, 0.95f);
+            shapeRenderer.rect(0f, 0f, WORLD_WIDTH, KEYBOARD_AREA_HEIGHT);
+        }
         shapeRenderer.end();
     }
 
@@ -284,14 +344,14 @@ public class ZTypeGame extends ApplicationAdapter {
             String todo = enemy.word.substring(enemy.progress);
 
             glyphLayout.setText(font, enemy.word);
-            float startX = enemy.x - glyphLayout.width / 2f;
-            float textY = enemy.y - 34f;
+            float startX = MathUtils.floor(enemy.x - glyphLayout.width / 2f);
+            float textY = MathUtils.floor(enemy.y - 40f);
 
             font.setColor(Color.valueOf("86efac"));
             font.draw(batch, done, startX, textY);
 
             glyphLayout.setText(font, done);
-            float doneWidth = glyphLayout.width;
+            float doneWidth = MathUtils.floor(glyphLayout.width);
             font.setColor(Color.WHITE);
             font.draw(batch, todo, startX + doneWidth, textY);
         }
@@ -304,19 +364,121 @@ public class ZTypeGame extends ApplicationAdapter {
 
         batch.begin();
         uiFont.setColor(Color.WHITE);
-        uiFont.draw(batch, "Score: " + score, 18f, WORLD_HEIGHT - 16f);
-        uiFont.draw(batch, "Lives: " + lives, 18f, WORLD_HEIGHT - 40f);
-        uiFont.draw(batch, "Level: " + level, 18f, WORLD_HEIGHT - 64f);
-        uiFont.draw(batch, "Target: " + targetWord, 18f, WORLD_HEIGHT - 88f);
+        uiFont.draw(batch, "Score: " + score, 22f, worldHeight - 20f);
+        uiFont.draw(batch, "Lives: " + lives, 22f, worldHeight - 58f);
+        uiFont.draw(batch, "Level: " + level, 22f, worldHeight - 96f);
+        uiFont.draw(batch, "Target: " + targetWord, 22f, worldHeight - 134f);
+
+        if (paused && running) {
+            uiFont.setColor(Color.valueOf("c7d2fe"));
+            uiFont.draw(batch, "Paused", WORLD_WIDTH / 2f - 32f, worldHeight / 2f + 24f);
+            uiFont.setColor(Color.WHITE);
+        }
 
         if (!running) {
             uiFont.setColor(Color.valueOf("fecdd3"));
-            uiFont.draw(batch, "Game Over", WORLD_WIDTH / 2f - 55f, WORLD_HEIGHT / 2f + 24f);
+            uiFont.draw(batch, "Game Over", WORLD_WIDTH / 2f - 55f, worldHeight / 2f + 24f);
             uiFont.setColor(Color.WHITE);
-            uiFont.draw(batch, "Final Score: " + score, WORLD_WIDTH / 2f - 65f, WORLD_HEIGHT / 2f - 2f);
-            uiFont.draw(batch, "Press R to Restart", WORLD_WIDTH / 2f - 80f, WORLD_HEIGHT / 2f - 28f);
+            uiFont.draw(batch, "Final Score: " + score, WORLD_WIDTH / 2f - 65f, worldHeight / 2f - 2f);
+            uiFont.draw(batch, "Tap Restart or Press R", WORLD_WIDTH / 2f - 95f, worldHeight / 2f - 28f);
         }
         batch.end();
+
+        if (showTouchKeyboard) {
+            drawKeyboard();
+        }
+    }
+
+    private void rebuildKeyboardLayout() {
+        keyButtons.clear();
+        if (!showTouchKeyboard) {
+            return;
+        }
+
+        float areaTop = KEYBOARD_AREA_HEIGHT;
+        float outerPadding = 16f;
+        float gap = 8f;
+        float rowHeight = 76f;
+        float down = KEYBOARD_SHIFT_DOWN;
+
+        addKeyRow("QWERTYUIOP", areaTop - outerPadding - rowHeight - down, outerPadding, gap, rowHeight);
+        addKeyRow("ASDFGHJKL", areaTop - outerPadding * 2f - rowHeight * 2f - down, outerPadding + 38f, gap, rowHeight);
+        addKeyRow("ZXCVBNM", areaTop - outerPadding * 3f - rowHeight * 3f - down, outerPadding + 96f, gap, rowHeight);
+
+        float actionY = 4f;
+        float actionGap = 12f;
+        float actionWidth = (WORLD_WIDTH - outerPadding * 2f - actionGap) / 2f;
+        float actionHeight = 64f;
+        keyButtons.add(KeyButton.action("Pause", 0f, outerPadding, actionY, actionWidth, actionHeight));
+        keyButtons.add(KeyButton.action("Restart", 1f, outerPadding + actionWidth + actionGap, actionY, actionWidth, actionHeight));
+    }
+
+    private void addKeyRow(String letters, float y, float leftPadding, float gap, float rowHeight) {
+        int count = letters.length();
+        float rowWidth = WORLD_WIDTH - leftPadding * 2f;
+        float keyWidth = (rowWidth - (count - 1) * gap) / count;
+        for (int i = 0; i < count; i++) {
+            char letter = letters.charAt(i);
+            float x = leftPadding + i * (keyWidth + gap);
+            keyButtons.add(KeyButton.letter(letter, x, y, keyWidth, rowHeight));
+        }
+    }
+
+    private void drawKeyboard() {
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        for (KeyButton key : keyButtons) {
+            if (key.type == KeyButton.TYPE_LETTER) {
+                shapeRenderer.setColor(0.17f, 0.28f, 0.46f, 1f);
+            } else {
+                shapeRenderer.setColor(0.25f, 0.31f, 0.52f, 1f);
+            }
+            shapeRenderer.rect(key.bounds.x, key.bounds.y, key.bounds.width, key.bounds.height);
+        }
+        shapeRenderer.end();
+
+        batch.begin();
+        for (KeyButton key : keyButtons) {
+            glyphLayout.setText(uiFont, key.label);
+            float textX = key.bounds.x + (key.bounds.width - glyphLayout.width) / 2f;
+            float textY = key.bounds.y + (key.bounds.height + glyphLayout.height) / 2f;
+            uiFont.setColor(Color.WHITE);
+            uiFont.draw(batch, key.label, textX, textY);
+        }
+        batch.end();
+    }
+
+    private boolean handleTouchInput(float worldX, float worldY) {
+        if (!showTouchKeyboard) {
+            return false;
+        }
+        for (KeyButton key : keyButtons) {
+            if (key.bounds.contains(worldX, worldY)) {
+                if (key.type == KeyButton.TYPE_LETTER) {
+                    if (running && !paused) {
+                        onLetterInput(Character.toLowerCase(key.letter));
+                    }
+                    return true;
+                }
+                if (key.actionCode == 0f) {
+                    if (running) {
+                        paused = !paused;
+                    }
+                    return true;
+                }
+                if (key.actionCode == 1f) {
+                    resetGame();
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public void resize(int width, int height) {
+        int backBufferWidth = Gdx.graphics.getBackBufferWidth();
+        int backBufferHeight = Gdx.graphics.getBackBufferHeight();
+        viewport.update(backBufferWidth, backBufferHeight, true);
     }
 
     @Override
@@ -358,6 +520,33 @@ public class ZTypeGame extends ApplicationAdapter {
             this.y = y;
             this.band = band;
             this.alphaBand = alphaBand;
+        }
+    }
+
+    private static class KeyButton {
+        static final int TYPE_LETTER = 0;
+        static final int TYPE_ACTION = 1;
+
+        final int type;
+        final char letter;
+        final String label;
+        final float actionCode;
+        final Rectangle bounds;
+
+        private KeyButton(int type, char letter, String label, float actionCode, Rectangle bounds) {
+            this.type = type;
+            this.letter = letter;
+            this.label = label;
+            this.actionCode = actionCode;
+            this.bounds = bounds;
+        }
+
+        static KeyButton letter(char letter, float x, float y, float width, float height) {
+            return new KeyButton(TYPE_LETTER, letter, String.valueOf(letter), -1f, new Rectangle(x, y, width, height));
+        }
+
+        static KeyButton action(String label, float actionCode, float x, float y, float width, float height) {
+            return new KeyButton(TYPE_ACTION, '\0', label, actionCode, new Rectangle(x, y, width, height));
         }
     }
 }

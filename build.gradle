@@ -1,5 +1,10 @@
 buildscript {
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.1.4'
+    }
+
     repositories {
+        google()
         mavenCentral()
         gradlePluginPortal()
     }
@@ -15,6 +20,7 @@ allprojects {
     }
 
     repositories {
+        google()
         mavenCentral()
     }
 }
@@ -38,6 +44,96 @@ project(':desktop') {
 
     application {
         mainClass = 'com.ztype.game.DesktopLauncher'
+    }
+}
+
+project(':android') {
+    apply plugin: 'com.android.application'
+
+    configurations { natives }
+
+    dependencies {
+        implementation project(':core')
+        implementation "com.badlogicgames.gdx:gdx-backend-android:$gdxVersion"
+        natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a"
+        natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a"
+        natives "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86_64"
+    }
+
+    android {
+        namespace 'com.ztype.game.android'
+        compileSdk 35
+        buildToolsVersion '37.0.0'
+
+        defaultConfig {
+            applicationId 'com.ztype.game'
+            minSdk 24
+            targetSdk 35
+            versionCode 1
+            versionName '1.0'
+        }
+
+        sourceSets {
+            main {
+                manifest.srcFile 'src/main/AndroidManifest.xml'
+                java.srcDirs = ['src/main/java']
+                assets.srcDirs = ['src/main/assets']
+                jniLibs.srcDirs = ['src/main/jniLibs']
+            }
+        }
+
+        packaging {
+            jniLibs {
+                useLegacyPackaging = true
+            }
+        }
+    }
+
+    tasks.register('copyAndroidNatives') {
+        doFirst {
+            def jniRoot = project(':android').file('src/main/jniLibs')
+            def armeabiDir = project(':android').file('src/main/jniLibs/armeabi-v7a')
+            def arm64Dir = project(':android').file('src/main/jniLibs/arm64-v8a')
+            def x64Dir = project(':android').file('src/main/jniLibs/x86_64')
+            jniRoot.mkdirs()
+            armeabiDir.mkdirs()
+            arm64Dir.mkdirs()
+            x64Dir.mkdirs()
+
+            configurations.natives.files.each { jar ->
+                if (jar.name.contains('armeabi-v7a')) {
+                    copy {
+                        from zipTree(jar)
+                        into armeabiDir
+                        include '*.so'
+                        eachFile { details -> details.path = details.name }
+                        includeEmptyDirs = false
+                    }
+                }
+                if (jar.name.contains('arm64-v8a')) {
+                    copy {
+                        from zipTree(jar)
+                        into arm64Dir
+                        include '*.so'
+                        eachFile { details -> details.path = details.name }
+                        includeEmptyDirs = false
+                    }
+                }
+                if (jar.name.contains('x86_64')) {
+                    copy {
+                        from zipTree(jar)
+                        into x64Dir
+                        include '*.so'
+                        eachFile { details -> details.path = details.name }
+                        includeEmptyDirs = false
+                    }
+                }
+            }
+        }
+    }
+
+    tasks.matching { it.name == 'preBuild' }.configureEach {
+        dependsOn 'copyAndroidNatives'
     }
 }
 
