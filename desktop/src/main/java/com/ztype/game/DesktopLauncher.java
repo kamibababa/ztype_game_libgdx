@@ -10,11 +10,12 @@ public class DesktopLauncher {
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
         config.setTitle("ZType LibGDX Clone");
         Graphics.DisplayMode displayMode = Lwjgl3ApplicationConfiguration.getDisplayMode();
-        int safeHeight = Math.max(900, displayMode.height - 180);
-        int windowHeight = Math.min(1400, safeHeight);
-        int windowWidth = Math.max(620, Math.round(windowHeight * (900f / 1400f)));
-        config.setWindowedMode(windowWidth, windowHeight);
-        config.setWindowPosition((displayMode.width - windowWidth) / 2, (displayMode.height - windowHeight) / 2);
+//        int safeHeight = Math.max(900, displayMode.height - 180);
+//        int windowHeight = Math.min(1400, safeHeight);
+//        int windowWidth = Math.max(620, Math.round(windowHeight * (900f / 1400f)));
+//        config.setWindowedMode(windowWidth, windowHeight);
+        config.setWindowedMode(600, 900);
+//        config.setWindowPosition((displayMode.width - windowWidth) / 2, (displayMode.height - windowHeight) / 2);
         config.setHdpiMode(HdpiMode.Pixels);
         config.setForegroundFPS(60);
         config.useVsync(true);
